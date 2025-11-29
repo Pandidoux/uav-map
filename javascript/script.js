@@ -163,14 +163,14 @@ const map = new maplibregl.Map({
 	hash: true,
 });
 
-map.fitBounds([
-	[-5.955, 41.387],
-	[ 9.799, 51.832],
-]);
 
 map.on('load', async () => {
 	console.log('map', map);
 
+	map.fitBounds([
+		[-5.955, 41.387],
+		[ 9.799, 51.832],
+	]);
 
 	// ========== Layers START ==========
 	/** Function to fetch data for the current viewport */
