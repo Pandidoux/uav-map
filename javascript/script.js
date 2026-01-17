@@ -51,19 +51,19 @@ const mapStyles = {
 };
 
 const mapLayer = {
-	// 'TRANSPORTS_DRONES_RESTRICTIONS': {
-	// 	id: 'TRANSPORTS_DRONES_RESTRICTIONS',
-	// 	source: 'TRANSPORTS.DRONES.RESTRICTIONS:carte_restriction_drones_lf',
-	// 	// filter: ['==', ['get', 'limite'], 'Vol interdit *'],
-	// 	type: 'fill',
-	// 	'paint': {
-	// 		'fill-extrusion-opacity': 0.5,
-	// 		'fill-extrusion-color': '#00F',
-	// 		'fill-extrusion-height': 1, // Units in meters
-	// 		'fill-extrusion-base': 0, // Units in meters
-	// 		'fill-extrusion-vertical-gradient': true
-	// 	},
-	// },
+	'LIMITES_ADMINISTRATIVES_EXPRESS': {
+		id: 'LIMITES_ADMINISTRATIVES_EXPRESS',
+		source: 'LIMITES_ADMINISTRATIVES_EXPRESS.LATEST:commune',
+		// filter: ['==', ['get', 'limite'], 'Vol interdit *'],
+		type: 'fill',
+		'paint': {
+			'fill-extrusion-opacity': 0.5,
+			'fill-extrusion-color': '#00F',
+			'fill-extrusion-height': 1, // Units in meters
+			'fill-extrusion-base': 0, // Units in meters
+			'fill-extrusion-vertical-gradient': true
+		},
+	},
 	'TRANSPORTS_DRONES_RESTRICTIONS_INTERDIT': {
 		id: 'TRANSPORTS_DRONES_RESTRICTIONS_INTERDIT',
 		source: 'TRANSPORTS.DRONES.RESTRICTIONS:carte_restriction_drones_lf',
@@ -131,12 +131,12 @@ const mapLayer = {
 	},
 	'TRANSPORTS_DRONES_RESTRICTIONS_120': {
 		id: 'TRANSPORTS_DRONES_RESTRICTIONS_120',
-		source: 'TRANSPORTS.DRONES.RESTRICTIONS:carte_restriction_drones_lf',
-		filter: ['==', ['get', 'limite'], 'Hauteur maximale de vol de 120 m *'],
+		source: 'LIMITES_ADMINISTRATIVES_EXPRESS.LATEST:commune',
+		// filter: ['==', ['get', 'limite'], 'Hauteur maximale de vol de 120 m *'],
 		type: 'fill-extrusion',
 		'paint': {
 			'fill-extrusion-opacity': 0.5,
-			'fill-extrusion-color': '#4f4',
+			'fill-extrusion-color': '#4cf',
 			'fill-extrusion-height': 120, // Units in meters
 			'fill-extrusion-base': 0, // Units in meters
 			'fill-extrusion-vertical-gradient': true
@@ -145,17 +145,34 @@ const mapLayer = {
 }
 
 let style = new URL(location.href).searchParams.get('style');
-if (style && style.length ) {
+if (style && style.length > 0) {
 	currentStyle = style;
 }
+
+function parseHash() {
+    const hash = window.location.hash.substring(1); // Remove the '#'
+    if (!hash) return null;
+
+    const parts = hash.split('/');
+    // if (parts.length !== 5) return null;
+
+    return {
+        zoom: parseFloat(parts[0]) || undefined,
+        lng: parseFloat(parts[1]) || undefined,
+        lat: parseFloat(parts[2]) || undefined,
+        bearing: parseFloat(parts[3]) || undefined,
+        pitch: parseFloat(parts[4]) || undefined,
+    };
+}
+const hashParams = parseHash();
 
 const map = new maplibregl.Map({
 	container: 'mapdiv', // container id
 	style: mapStyles[currentStyle].url, // style URL
-	// center: [1.922, 46.863], // starting position [lng, lat]
-	// zoom: 5.5, // starting zoom
-	bearing : 0.0,
-	pitch : 0,
+	center: (hashParams && hashParams.lng && hashParams.lat) ? [hashParams.lng, hashParams.lat] : undefined, // starting position [lng, lat]
+    zoom: (hashParams && hashParams.zoom) ? hashParams.zoom : null, // starting zoom
+    bearing: (hashParams && hashParams.bearing) ? hashParams.bearing : 0.0,
+    pitch: (hashParams && hashParams.pitch) ? hashParams.pitch : 0,
 	maxZoom: 18,
 	maxPitch: 68.5,
 	attributionControl: false,
@@ -167,15 +184,17 @@ const map = new maplibregl.Map({
 map.on('load', async () => {
 	console.log('map', map);
 
-	map.fitBounds([
-		[-5.955, 41.387],
-		[ 9.799, 51.832],
-	]);
+	if (!hashParams) {
+		map.fitBounds([
+			[-5.955, 41.387],
+			[ 9.799, 51.832],
+		]);
+	}
 
 	// ========== Layers START ==========
-	/** Function to fetch data for the current viewport */
+	// Function to fetch data for the current viewport
 	function updateData() {
-		if (map.getZoom() < 8) {
+		if (map.getZoom() < 10) {
 			return;
 		}
 
@@ -189,7 +208,7 @@ map.on('load', async () => {
 		].join(',');
 
 		// Replace with your actual GeoJSON endpoint
-		const url = 'https://data.geopf.fr/wfs/ows' +'?'+ new URLSearchParams({
+		const urlTransportsDronesRestrictions = 'https://data.geopf.fr/wfs/ows' +'?'+ new URLSearchParams({
 			service: 'WFS',
 			version: '2.0.0',
 			request: 'GetFeature',
@@ -200,26 +219,53 @@ map.on('load', async () => {
 			bbox: bbox,
 		}).toString();
 
-		fetch(url).then(response => response.json()).then(data => {
-			try {
-				map.getSource('TRANSPORTS.DRONES.RESTRICTIONS:carte_restriction_drones_lf').setData(data);
-			} catch (error) {
-				console.error(error);
-				if (window.confirm('Une erreur est survenue avec ce style.\nVeuillez recharger la page.')) {
-					var url = new URL(window.location.href);
-					url.searchParams.set('style', currentStyle);
-					// location.reload();
-					window.location.href = url;
-				}
-			}
+		fetch(urlTransportsDronesRestrictions).then(response => response.json()).then(dataTransportsDronesRestrictions => {
+			map.getSource('TRANSPORTS.DRONES.RESTRICTIONS:carte_restriction_drones_lf').setData(dataTransportsDronesRestrictions);
+			updateData120m(dataTransportsDronesRestrictions);
 		}).catch(error => {
-			console.error('Error fetching data:', error);
+			console.error('Error fetching dataTransportsDronesRestrictions:', error);
 		});
+	
+		function updateData120m(dataTransportsDronesRestrictions) {
+			const urlLimiteAdministrative = 'https://data.geopf.fr/wfs/ows?' + new URLSearchParams({
+				service: 'WFS',
+				version: '2.0.0',
+				request: 'GetFeature',
+				typenames: 'LIMITES_ADMINISTRATIVES_EXPRESS.LATEST:commune',
+				srsname: 'EPSG:4326',
+				outputformat: 'application/json',
+				bbox: bbox,
+			}).toString();
+
+			fetch(urlLimiteAdministrative).then((response) => response.json()).then((dataLimiteAdministrative) => {
+				const dataLimiteAdministrativePoly = turf.union(turf.featureCollection(dataLimiteAdministrative.features));
+				const dataTransportsDronesRestrictionsPoly = turf.union(turf.featureCollection(dataTransportsDronesRestrictions.features));
+				const data120m = turf.difference(
+					turf.featureCollection([dataLimiteAdministrativePoly, dataTransportsDronesRestrictionsPoly])
+				);
+				map.getSource('LIMITES_ADMINISTRATIVES_EXPRESS.LATEST:commune').setData(data120m);
+			}).catch((error) => {
+				console.error('Error fetching data120m:', error);
+			});
+		}
+
 	}
+
+
 	// Update data when the map moves
 	map.on('moveend', () => {
 		updateData();
 	});
+	
+	map.addSource('LIMITES_ADMINISTRATIVES_EXPRESS.LATEST:commune', {
+		attribution: 'LIMITES_ADMINISTRATIVES_EXPRESS.LATEST:commune',
+		type: 'geojson',
+		data: {
+			type: 'FeatureCollection',
+			features: []
+		}
+	});
+
 	map.addSource('TRANSPORTS.DRONES.RESTRICTIONS:carte_restriction_drones_lf', {
 		attribution: 'Restrictions UAS catégorie Ouverte et Aéromodélisme <a href="http://www.dac-s.aviation-civile.gouv.fr/spip.php?rubrique8" target="_blank">© DGAC (DTA, DSAC-IR, STAC et SNIA)</a>',
 		type: 'geojson',
@@ -254,7 +300,7 @@ map.on('load', async () => {
 				closeButton: true,
 				closeOnClick: false,
 			});
-			let content = `${e.features[0].properties.limite}`;
+			let content = (e.features[0].properties.limite) ? e.features[0].properties.limite : 'Hauteur maximale de vol de 120 m *';
 			if (e.features[0].properties.remarque) {
 				content += `<br>${e.features[0].properties.remarque}`;
 			}
@@ -370,6 +416,11 @@ map.on('load', async () => {
 
 
 	// ===== Layer Control START =====
+	const setStyleURL = function (currentStyle) {
+		const url = new URL(window.location.href);
+		url.searchParams.set('style', currentStyle);
+		window.history.replaceState({}, '', url.href);
+	}
 	class StyleSwitcherControl {
 		constructor(styles) {
 			this.styles = styles;
@@ -464,6 +515,7 @@ map.on('load', async () => {
 				this.saveCustomSourcesAndLayers();
 				this.map.setStyle(this.styles[newStyleCode].url);
 				currentStyle = newStyleCode;
+				setStyleURL(currentStyle);
 				this.map.once("styledata", () => {
 					setTimeout(() => {
 						this.restoreCustomSourcesAndLayers();
