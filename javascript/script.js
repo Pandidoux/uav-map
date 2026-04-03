@@ -268,18 +268,16 @@ map.on('load', async () => {
 			map.addSource('ORTHOIMAGERY.ORTHOPHOTOS', {
 				type: 'raster',
 				tiles: [
-					'https://data.geopf.fr/wms-r/?' + new URLSearchParams({
-						service: 'WMS',
-						request: 'GetMap',
-						layers: 'ORTHOIMAGERY.ORTHOPHOTOS',
-						styles: 'normal',
+					'https://data.geopf.fr/wmts/?' + new URLSearchParams({
+						service: 'WMTS',
+						request: 'GetTile',
+						layer: 'ORTHOIMAGERY.ORTHOPHOTOS',
+						style: 'normal',
 						format: 'image/jpeg',
 						transparent: 'true',
-						version: '1.3.0',
-						width: '256',
-						height: '256',
-						crs: 'EPSG:3857',
-					}).toString() + '&bbox={bbox-epsg-3857}',
+						version: '1.0.0',
+						tilematrixset: 'PM',
+					}).toString() + '&TileMatrix={z}&TileCol={x}&TileRow={y}',
 				],
 				tileSize: 256,
 				attribution: 'Orthophotos <a href="https://geoservices.ign.fr/" target="_blank">© IGN</a>',
