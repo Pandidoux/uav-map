@@ -248,7 +248,6 @@ map.on('load', async () => {
 				console.error('Error fetching data120m:', error);
 			});
 		}
-
 	}
 
 
@@ -467,14 +466,25 @@ map.on('load', async () => {
 
 		restoreCustomSourcesAndLayers() {
 			for (const [sourceId, source] of Object.entries(this.customSourcesAndLayers.sources)) {
-				this.map.addSource(sourceId, source);
+				if (!this.map.getSource(sourceId)) {  // Vérification avant ajout
+					this.map.addSource(sourceId, source);
+				} else {
+					// La source existe déjà, on réinjecte juste les données
+					const existingSource = this.map.getSource(sourceId);
+					if (existingSource && source.data) {
+						existingSource.setData(source.data);
+					}
+				}
 			}
 			for (const layer of this.customSourcesAndLayers.layers) {
-				this.map.addLayer(layer);
+				if (!this.map.getLayer(layer.id)) {  // Vérification avant ajout
+					this.map.addLayer(layer);
+				}
 			}
-
 			for (const [IdImage, Image] of Object.entries(this.customSourcesAndLayers.image)) {
-				this.map.addImage(IdImage, Image.data);
+				if (!this.map.hasImage(IdImage)) {  // Vérification avant ajout
+					this.map.addImage(IdImage, Image.data);
+				}
 			}
 		}
 
@@ -513,14 +523,20 @@ map.on('load', async () => {
 			select.addEventListener("change", (e) => {
 				const newStyleCode = e.target.value;
 				this.saveCustomSourcesAndLayers();
-				this.map.setStyle(this.styles[newStyleCode].url);
+
+				// setStyle avec diff:true préserve les sources/couches custom quand possible
+				this.map.setStyle(this.styles[newStyleCode].url, { diff: false });
 				currentStyle = newStyleCode;
 				setStyleURL(currentStyle);
-				this.map.once("styledata", () => {
-					setTimeout(() => {
-						this.restoreCustomSourcesAndLayers();
-					}, 500);
-				});
+
+				// On attend que le style soit vraiment prêt avec l'événement 'idle'
+				// qui se déclenche seulement quand la carte est stable
+				const restoreOnIdle = () => {
+					this.restoreCustomSourcesAndLayers();
+					updateData(); // Recharge les données WFS après restauration
+					this.map.off('idle', restoreOnIdle); // Nettoyage du listener
+				};
+				this.map.once('idle', restoreOnIdle);
 			});
 			styleSwitcher.appendChild(select);
 			this.container.appendChild(styleSwitcher);
