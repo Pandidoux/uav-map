@@ -311,7 +311,7 @@ map.on('load', async () => {
 	// ===== Source & Layer Ortho END =====
 
 	map.addSource('LIMITES_ADMINISTRATIVES_EXPRESS.LATEST:commune', {
-		attribution: 'LIMITES_ADMINISTRATIVES_EXPRESS.LATEST:commune',
+		attribution: 'Admin Express mises à jour en continu Dernière édition commune <a href="https://geoservices.ign.fr/" target="_blank">© IGN</a>',
 		type: 'geojson',
 		data: {
 			type: 'FeatureCollection',
