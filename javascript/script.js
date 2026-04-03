@@ -48,6 +48,13 @@ const mapStyles = {
 		image: "",
 		name: "IGN PlanIGN",
 	},
+	"ign-orthophotos": {
+		code: "ign-orthophotos",
+		url: "https://tiles.openfreemap.org/styles/positron", // style de base neutre (labels uniquement)
+		image: "",
+		name: "IGN Orthophotos",
+		ortho: true, // pseudo-style : fond raster WMS superposé au style de base
+	},
 };
 
 const mapLayer = {
@@ -250,12 +257,61 @@ map.on('load', async () => {
 		}
 	}
 
-
 	// Update data when the map moves
 	map.on('moveend', () => {
 		updateData();
 	});
-	
+
+	// ===== Source & Layer Ortho START =====
+	function addOrthoLayer() {
+		if (!map.getSource('ORTHOIMAGERY.ORTHOPHOTOS')) {
+			map.addSource('ORTHOIMAGERY.ORTHOPHOTOS', {
+				type: 'raster',
+				tiles: [
+					'https://data.geopf.fr/wms-r/?' + new URLSearchParams({
+						service: 'WMS',
+						request: 'GetMap',
+						layers: 'ORTHOIMAGERY.ORTHOPHOTOS',
+						styles: 'normal',
+						format: 'image/jpeg',
+						transparent: 'true',
+						version: '1.3.0',
+						width: '256',
+						height: '256',
+						crs: 'EPSG:3857',
+					}).toString() + '&bbox={bbox-epsg-3857}',
+				],
+				tileSize: 256,
+				attribution: 'Orthophotos <a href="https://geoservices.ign.fr/" target="_blank">© IGN</a>',
+			});
+		}
+		if (!map.getLayer('ORTHOIMAGERY.ORTHOPHOTOS')) {
+			// Insérer sous les couches drones pour garder les restrictions visibles
+			const firstDroneLayer = map.getLayer('TRANSPORTS_DRONES_RESTRICTIONS_INTERDIT');
+			const beforeId = firstDroneLayer ? 'TRANSPORTS_DRONES_RESTRICTIONS_INTERDIT' : undefined;
+			map.addLayer({
+				id: 'ORTHOIMAGERY.ORTHOPHOTOS',
+				source: 'ORTHOIMAGERY.ORTHOPHOTOS',
+				type: 'raster',
+			}, beforeId);
+		}
+	}
+
+	function removeOrthoLayer() {
+		if (map.getLayer('ORTHOIMAGERY.ORTHOPHOTOS')) {
+			map.removeLayer('ORTHOIMAGERY.ORTHOPHOTOS');
+		}
+		if (map.getSource('ORTHOIMAGERY.ORTHOPHOTOS')) {
+			map.removeSource('ORTHOIMAGERY.ORTHOPHOTOS');
+		}
+	}
+
+	// Afficher l'ortho si le style courant est ign-orthophotos
+	if (mapStyles[currentStyle] && mapStyles[currentStyle].ortho) {
+		addOrthoLayer();
+	}
+	// ===== Source & Layer Ortho END =====
+
 	map.addSource('LIMITES_ADMINISTRATIVES_EXPRESS.LATEST:commune', {
 		attribution: 'LIMITES_ADMINISTRATIVES_EXPRESS.LATEST:commune',
 		type: 'geojson',
@@ -445,7 +501,8 @@ map.on('load', async () => {
 			};
 			const sources = this.map.getStyle().sources;
 			for (const [sourceId, source] of Object.entries(sources)) {
-				if (!source.url) {
+				// Exclure les sources du style de base (avec url) et la couche ortho (gérée séparément)
+				if (!source.url && sourceId !== 'ORTHOIMAGERY.ORTHOPHOTOS') {
 					this.customSourcesAndLayers.sources[sourceId] = source;
 				}
 			}
@@ -522,19 +579,23 @@ map.on('load', async () => {
 			});
 			select.addEventListener("change", (e) => {
 				const newStyleCode = e.target.value;
+				const newStyle = this.styles[newStyleCode];
 				this.saveCustomSourcesAndLayers();
 
-				// setStyle avec diff:true préserve les sources/couches custom quand possible
-				this.map.setStyle(this.styles[newStyleCode].url, { diff: false });
+				this.map.setStyle(newStyle.url, { diff: false });
 				currentStyle = newStyleCode;
 				setStyleURL(currentStyle);
 
-				// On attend que le style soit vraiment prêt avec l'événement 'idle'
-				// qui se déclenche seulement quand la carte est stable
 				const restoreOnIdle = () => {
 					this.restoreCustomSourcesAndLayers();
-					updateData(); // Recharge les données WFS après restauration
-					this.map.off('idle', restoreOnIdle); // Nettoyage du listener
+					// Ajouter ou retirer la couche ortho selon le style choisi
+					if (newStyle.ortho) {
+						addOrthoLayer();
+					} else {
+						removeOrthoLayer();
+					}
+					updateData();
+					this.map.off('idle', restoreOnIdle);
 				};
 				this.map.once('idle', restoreOnIdle);
 			});
@@ -557,6 +618,3 @@ map.on('load', async () => {
 	// ========== Control END ==========
 
 });
-
-
-
