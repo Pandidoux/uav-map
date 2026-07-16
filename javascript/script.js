@@ -63,6 +63,9 @@ const mapLayer = {
 		source: 'LIMITES_ADMINISTRATIVES_EXPRESS.LATEST:commune',
 		// filter: ['==', ['get', 'limite'], 'Vol interdit *'],
 		type: 'fill',
+		'layout': {
+			'visibility': 'visible'
+		},
 		'paint': {
 			'fill-extrusion-opacity': 0.5,
 			'fill-extrusion-color': '#00F',
@@ -76,6 +79,9 @@ const mapLayer = {
 		source: 'TRANSPORTS.DRONES.RESTRICTIONS:carte_restriction_drones_lf',
 		filter: ['==', ['get', 'limite'], 'Vol interdit *'],
 		type: 'fill-extrusion',
+		'layout': {
+			'visibility': 'visible'
+		},
 		'paint': {
 			'fill-extrusion-opacity': 0.5,
 			'fill-extrusion-color': '#F00',
@@ -89,6 +95,9 @@ const mapLayer = {
 		source: 'TRANSPORTS.DRONES.RESTRICTIONS:carte_restriction_drones_lf',
 		filter: ['==', ['get', 'limite'], 'Hauteur maximale de vol de 30 m *'],
 		type: 'fill-extrusion',
+		'layout': {
+			'visibility': 'visible'
+		},
 		'paint': {
 			'fill-extrusion-opacity': 0.5,
 			'fill-extrusion-color': '#f80',
@@ -102,6 +111,9 @@ const mapLayer = {
 		source: 'TRANSPORTS.DRONES.RESTRICTIONS:carte_restriction_drones_lf',
 		filter: ['==', ['get', 'limite'], 'Hauteur maximale de vol de 50 m *'],
 		type: 'fill-extrusion',
+		'layout': {
+			'visibility': 'visible'
+		},
 		'paint': {
 			'fill-extrusion-opacity': 0.5,
 			'fill-extrusion-color': '#fA0',
@@ -115,6 +127,9 @@ const mapLayer = {
 		source: 'TRANSPORTS.DRONES.RESTRICTIONS:carte_restriction_drones_lf',
 		filter: ['==', ['get', 'limite'], 'Hauteur maximale de vol de 60 m *'],
 		type: 'fill-extrusion',
+		'layout': {
+			'visibility': 'visible'
+		},
 		'paint': {
 			'fill-extrusion-opacity': 0.5,
 			'fill-extrusion-color': '#ff0',
@@ -128,6 +143,9 @@ const mapLayer = {
 		source: 'TRANSPORTS.DRONES.RESTRICTIONS:carte_restriction_drones_lf',
 		filter: ['==', ['get', 'limite'], 'Hauteur maximale de vol de 100 m *'],
 		type: 'fill-extrusion',
+		'layout': {
+			'visibility': 'visible'
+		},
 		'paint': {
 			'fill-extrusion-opacity': 0.5,
 			'fill-extrusion-color': '#Af4',
@@ -141,6 +159,9 @@ const mapLayer = {
 		source: 'LIMITES_ADMINISTRATIVES_EXPRESS.LATEST:commune',
 		// filter: ['==', ['get', 'limite'], 'Hauteur maximale de vol de 120 m *'],
 		type: 'fill-extrusion',
+		'layout': {
+			'visibility': 'visible'
+		},
 		'paint': {
 			'fill-extrusion-opacity': 0.5,
 			'fill-extrusion-color': '#4cf',
@@ -467,6 +488,71 @@ map.on('load', async () => {
 	const LegendControl = new MaplibreLegendControl.MaplibreLegendControl(targets, options);
 	// ===== Control Legend END =====
 
+	// ===== Drone Restrictions Toggle Control START =====
+	class DroneRestrictionsToggleControl {
+		constructor() {
+			this.container = document.createElement('div');
+			this.container.className = "maplibregl-ctrl maplibregl-ctrl-group";
+			this.isActive = true;
+			this.button = null;
+		}
+
+		onAdd(map) {
+			this.map = map;
+			this.container.innerHTML = "";
+			this.createButton();
+			return this.container;
+		}
+
+		onRemove() {
+			this.container.parentNode.removeChild(this.container);
+			this.map = undefined;
+		}
+
+		createButton() {
+			const button = document.createElement('button');
+			button.className = "maplibregl-ctrl-icon drone-restrictions-toggle visible";
+			button.title = "Afficher/masquer les restrictions drones";
+
+			button.addEventListener('click', () => {
+				this.toggleLayers();
+			});
+
+			this.button = button;
+			this.container.appendChild(button);
+		}
+
+		toggleLayers() {
+			const layerIds = [
+				'TRANSPORTS_DRONES_RESTRICTIONS_INTERDIT',
+				'TRANSPORTS_DRONES_RESTRICTIONS_30',
+				'TRANSPORTS_DRONES_RESTRICTIONS_50',
+				'TRANSPORTS_DRONES_RESTRICTIONS_60',
+				'TRANSPORTS_DRONES_RESTRICTIONS_100',
+				'TRANSPORTS_DRONES_RESTRICTIONS_120'
+			];
+
+			const currentVisibility = this.map.getLayoutProperty(layerIds[0], 'visibility');
+			const newVisibility = currentVisibility === 'visible' ? 'none' : 'visible';
+
+			layerIds.forEach(layerId => {
+				if (this.map.getLayer(layerId)) {
+					this.map.setLayoutProperty(layerId, 'visibility', newVisibility);
+				}
+			});
+
+			// Toggle the 'visible' class on the button
+			if (newVisibility === 'visible') {
+				this.button.classList.add('visible');
+			} else {
+				this.button.classList.remove('visible');
+			}
+
+			this.isActive = newVisibility === 'visible';
+		}
+	}
+	const droneRestrictionsToggle = new DroneRestrictionsToggleControl();
+	// ===== Drone Restrictions Toggle Control END =====
 
 	// ===== Layer Control START =====
 	const setStyleURL = function (currentStyle) {
@@ -608,6 +694,7 @@ map.on('load', async () => {
 	map.addControl(GeocoderControl, 'top-left');
 	map.addControl(styleSwitcher, "top-left");
 	map.addControl(NavigationControl, 'top-right');
+	map.addControl(droneRestrictionsToggle, 'top-left');
 	map.addControl(FullscreenControl, 'top-right');
 	map.addControl(GeolocateControl, 'top-right');
 	map.addControl(AttributionControl, 'bottom-right');
